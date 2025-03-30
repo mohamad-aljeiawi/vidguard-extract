@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests
-from urllib.parse import urljoin, urlencode, quote_plus, urlparse, urlunparse
+from urllib.parse import urljoin, quote_plus
 from src.utils.vidguard import get_video_url
 from src.utils.utils import is_valid_url
 from dotenv import load_dotenv
@@ -52,20 +52,19 @@ async def extract_endpoint(request: FastAPIRequest):
 
         return ResponseExtract(url=f"{BASE_URL}/proxy_stream?url={encoded_url}")
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=f"Proxy error: {str(e)}")
 
 
 @app.get("/proxy_stream")
 async def proxy_stream(url: str):
     if not url or not is_valid_url(url):
+        print(f"Missing or invalid 'url' parameter: {url}")
         raise HTTPException(
             status_code=400, detail="Missing or invalid 'url' parameter"
         )
 
     if url.startswith("@"):
         url = url[1:]
-
-    print(f"Proxying request for: {url}")
 
     try:
         headers: dict[str, str] = {
@@ -79,12 +78,8 @@ async def proxy_stream(url: str):
         response.raise_for_status()
 
         content_type: str = response.headers.get("content-type", "").lower()
-        print(f"VidGuard responded with Content-Type: {content_type}")
-
         if "mpegurl" in content_type or "x-mpegurl" in content_type:
             m3u8_content: str = response.text
-            print(f"Processing M3U8 content (first 200 chars):\n{m3u8_content[:200]}")
-
             rewritten_lines: list[str] = []
             base_url: str = url
 
@@ -102,7 +97,6 @@ async def proxy_stream(url: str):
                     f"{BASE_URL}/proxy_stream?url={encoded_segment_url}"
                 )
 
-                print(f"  Rewriting: {original_segment_url} -> {proxy_segment_url}")
                 rewritten_lines.append(proxy_segment_url)
 
             final_m3u8: str = "\n".join(rewritten_lines)
@@ -111,7 +105,6 @@ async def proxy_stream(url: str):
             )
 
         else:
-            print(f"Streaming content directly (Content-Type: {content_type})")
 
             def iterfile():
                 for chunk in response.iter_content(chunk_size=8192):
