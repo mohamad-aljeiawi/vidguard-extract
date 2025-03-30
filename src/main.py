@@ -1,22 +1,18 @@
-from typing import Union
 import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from src.utils.vidguard import get_video_url
-
-CORS = {
-    "origins": ["*"],
-    # "allow_methods": ["*"],
-    # "allow_headers": ["*"],
-}
+from src.utils.utils import is_valid_url
 
 app = FastAPI()
-# app.add_middleware(CORSMiddleware, **CORS)
-
-
-class Item(BaseModel):
-    url: str
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
@@ -26,11 +22,21 @@ def read_root():
     }
 
 
+class RequestExtract(BaseModel):
+    url: str
+
+
+class ResponseExtract(BaseModel):
+    url: str
+
+
 @app.post("/extract")
-async def extract_endpoint(item: Item):
+async def extract_endpoint(request: RequestExtract):
     try:
-        url = get_video_url(item.url)
-        return {"url": f"http://45.88.9.31:8001/proxy?url={url}"}
+        if not is_valid_url(request.url):
+            raise ValueError("Invalid URL")
+        url: str = get_video_url(request.url)
+        return ResponseExtract(url=f"http://45.88.9.31:8001/proxy?url={url}")
 
     except Exception as e:
         return {"error": str(e)}
