@@ -1,0 +1,11 @@
+.venv/
+.vscode/
+.env
+__pycache__/
+logs
+*.log
+*.html
+# Output
+.output
+.vercel
+test.py
