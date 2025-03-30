@@ -40,93 +40,78 @@ class ResponseExtract(BaseModel):
     url: str
 
 
-@app.post("/extract")
-async def extract_endpoint(request: RequestExtract):
+@app.get("/extract")
+async def extract_endpoint(request: FastAPIRequest):
     try:
-        if not is_valid_url(request.url):
+        url = request.query_params.get("url")
+        if not url or not is_valid_url(url):
             raise ValueError("Invalid URL")
-        url: str = get_video_url(request.url)
 
-        # Make sure we properly encode the URL to preserve all query parameters
-        encoded_url = quote_plus(url)
+        video_url: str = get_video_url(url)
+        encoded_url: str = quote_plus(video_url)
 
-        # return ResponseExtract(url=f"http://45.88.9.31:8002/proxy_stream?url={encoded_url}")
         return ResponseExtract(url=f"{BASE_URL}/proxy_stream?url={encoded_url}")
-
     except Exception as e:
         return {"error": str(e)}
 
 
 @app.get("/proxy_stream")
-async def proxy_stream(url: str):  # FastAPI يفك التشفير تلقائيا من query param
+async def proxy_stream(url: str):
     if not url or not is_valid_url(url):
         raise HTTPException(
             status_code=400, detail="Missing or invalid 'url' parameter"
         )
 
-    # Remove any @ character at the beginning of the URL if it exists
     if url.startswith("@"):
         url = url[1:]
 
     print(f"Proxying request for: {url}")
 
     try:
-        # طلب المحتوى من VidGuard باستخدام IP الـ VPS
-        # تمرير بعض الهيدرات الشائعة قد يساعد
-        headers = {
+        headers: dict[str, str] = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Referer": "https://vidguard.to/",  # قد تحتاج لتغيير الريفيرير
+            "Referer": "https://vidguard.to/",
         }
 
-        response = requests.get(url, headers=headers, stream=True, allow_redirects=True)
-        # رفع الخطأ إذا لم تنجح VidGuard في الرد
+        response: requests.Response = requests.get(
+            url, headers=headers, stream=True, allow_redirects=True
+        )
         response.raise_for_status()
 
-        content_type = response.headers.get("content-type", "").lower()
+        content_type: str = response.headers.get("content-type", "").lower()
         print(f"VidGuard responded with Content-Type: {content_type}")
 
-        # === معالجة M3U8 ===
         if "mpegurl" in content_type or "x-mpegurl" in content_type:
-            # قراءة محتوى M3U8 كنص
-            m3u8_content = response.text
+            m3u8_content: str = response.text
             print(f"Processing M3U8 content (first 200 chars):\n{m3u8_content[:200]}")
 
-            # تحليل وإعادة كتابة الروابط
-            rewritten_lines = []
-            base_url = url  # الرابط الأصلي لـ M3U8 هذا
+            rewritten_lines: list[str] = []
+            base_url: str = url
 
             for line in m3u8_content.splitlines():
-                line = line.strip()
+                line: str = line.strip()
                 if not line or line.startswith("#"):
-                    # الاحتفاظ بالتعليقات والأسطر الفارغة كما هي
                     rewritten_lines.append(line)
                     continue
+                original_segment_url: str = line
+                absolute_segment_url: str = urljoin(base_url, original_segment_url)
 
-                # هذا السطر هو رابط (إما ملف M3U8 آخر أو مقطع TS)
-                original_segment_url = line
-                # بناء الرابط المطلق إذا كان نسبيًا
-                absolute_segment_url = urljoin(base_url, original_segment_url)
+                encoded_segment_url: str = quote_plus(absolute_segment_url)
 
-                # تشفير رابط المقطع الأصلي
-                encoded_segment_url = quote_plus(absolute_segment_url)
-
-                # إنشاء رابط البروكسي الجديد لهذا المقطع
-                # يستخدم نفس Endpoint (/proxy_stream)
-                proxy_segment_url = f"{BASE_URL}/proxy_stream?url={encoded_segment_url}"  # استخدام رابط نسبي للبروكسي
+                proxy_segment_url: str = (
+                    f"{BASE_URL}/proxy_stream?url={encoded_segment_url}"
+                )
 
                 print(f"  Rewriting: {original_segment_url} -> {proxy_segment_url}")
                 rewritten_lines.append(proxy_segment_url)
 
-            # إعادة M3U8 المعدل
-            final_m3u8 = "\n".join(rewritten_lines)
+            final_m3u8: str = "\n".join(rewritten_lines)
             return Response(
                 content=final_m3u8, media_type="application/vnd.apple.mpegurl"
             )
 
-        # === معالجة مقاطع الفيديو (TS) أو أي شيء آخر ===
         else:
             print(f"Streaming content directly (Content-Type: {content_type})")
-            # بث المحتوى مباشرة للعميل
 
             def iterfile():
                 for chunk in response.iter_content(chunk_size=8192):
@@ -141,7 +126,7 @@ async def proxy_stream(url: str):  # FastAPI يفك التشفير تلقائي�
                     for k, v in response.headers.items()
                     if k.lower() in ["content-length", "content-type"]
                 },
-            )  # تمرير الهيدرات المهمة
+            )
 
     except requests.RequestException as exc:
         print(f"HTTP Request Error during proxy: {exc}")
