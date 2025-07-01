@@ -6,11 +6,8 @@ from src.utils.aadecode import decode, extract_json
 
 
 SUPPORTED_DOMAINS: list[str] = [
-    r"shoofflix\.site",
-    r"bembed\.net",
     r"vidguard\.to",
-    r"vembed\.net",
-    r"listeamed\.net",
+    r"listeamed\.net"
 ]
 
 
