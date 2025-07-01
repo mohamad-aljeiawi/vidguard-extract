@@ -20,7 +20,7 @@ VidGuard Extract is an API designed to block annoying and obscene ads from video
 Clone the repository from the Git server:
 
 ```bash
-git clone /CP0004/vidguard-extract.git
+git clone https://github.com/mohamad-aljeiawi/vidguard-extract
 cd vidguard-extract
 ```
 
@@ -68,7 +68,7 @@ cp .env.example .env
 ```
 
 Edit the `.env` file to configure your environment variables:
-- `BASE_URL`: The base URL for your API
+- `BASE_URL`: The base URL for your API [ IP Vps or domain + post API should run on : http://XX.XX.XX.XX:XXXX"
 - `PORT`: The port number the API should run on
 
 ## Running in Development
@@ -78,7 +78,7 @@ Edit the `.env` file to configure your environment variables:
 For local development with auto-reload:
 
 ```bash
-uvicorn src.main:app --host 127.0.0.1 --port 8002 --reload
+uvicorn src.main:app --host 127.0.0.1 --port XXXX
 ```
 
 ### macOS and Linux
@@ -86,13 +86,13 @@ uvicorn src.main:app --host 127.0.0.1 --port 8002 --reload
 For local development with auto-reload:
 
 ```bash
-uvicorn src.main:app --host 127.0.0.1 --port 8002 --reload
+uvicorn src.main:app --host 127.0.0.1 --port XXXX
 ```
 
 For global access (on a server):
 
 ```bash
-uvicorn src.main:app --host 0.0.0.0 --port 8002 --reload
+uvicorn src.main:app --host 0.0.0.0 --port XXXX
 ```
 
 Note: The port can be changed according to your requirements.
@@ -119,6 +119,7 @@ sudo nano /etc/systemd/system/vidguard.service
 ```
 
 3. Add the following content (adjust paths as needed):
+Note: The file path can be changed according to your requirements.
 
 ```ini
 [Unit]
@@ -127,10 +128,10 @@ After=network.target
 
 [Service]
 User=root
-WorkingDirectory=/root/project/python/vidguard-extract
-ExecStart=/root/project/python/vidguard-extract/.venv/bin/uvicorn src.main:app --host 0.0.0.0 --port 8002
+WorkingDirectory=/your-path/vidguard-extract
+ExecStart=/your-path/vidguard-extract/.venv/bin/uvicorn src.main:app --host 0.0.0.0 --port XXXX
 Restart=always
-EnvironmentFile=/root/project/python/vidguard-extract/.env
+EnvironmentFile=/your-path/vidguard-extract/.env
 
 [Install]
 WantedBy=multi-user.target
@@ -166,20 +167,21 @@ sudo systemctl enable nginx
 ```
 
 2. Create an Nginx configuration file:
+Note: that I used the name "api-public", you can choose any other name
 
 ```bash
 sudo nano /etc/nginx/sites-available/api-public
 ```
 
-3. Add the following configuration (adjust the server_name as needed):
+3. Add the following configuration (adjust the server_name as needed, Change the bot in this place proxy_pass http://127.0.0.1:PORT; Same protocol that was used for API 
 
 ```nginx
 server {
     listen 80;
-    server_name 45.88.9.31;
+    server_name XX.XX.XX...;
 
     location / {
-        proxy_pass http://127.0.0.1:8002;
+        proxy_pass http://127.0.0.1:XXXX;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
